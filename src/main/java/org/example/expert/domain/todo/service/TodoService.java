@@ -9,13 +9,18 @@ import org.example.expert.domain.todo.dto.response.TodoResponse;
 import org.example.expert.domain.todo.dto.response.TodoSaveResponse;
 import org.example.expert.domain.todo.entity.Todo;
 import org.example.expert.domain.todo.repository.TodoRepository;
+import org.example.expert.domain.todo.spec.TodoSpecs;
 import org.example.expert.domain.user.dto.response.UserResponse;
 import org.example.expert.domain.user.entity.User;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.time.LocalDateTime;
 
 @Service
 @RequiredArgsConstructor
@@ -48,10 +53,22 @@ public class TodoService {
         );
     }
 
-    public Page<TodoResponse> getTodos(int page, int size) {
-        Pageable pageable = PageRequest.of(page - 1, size);
+    public Page<TodoResponse> getTodos(int page, int size, String weather, LocalDateTime start, LocalDateTime end) {
+        Pageable pageable = PageRequest.of(page - 1, size,
+                Sort.by(Sort.Direction.DESC, "updatedAt"));
 
-        Page<Todo> todos = todoRepository.findAllByOrderByModifiedAtDesc(pageable);
+        // Specification 사용.
+        Specification<Todo> spec = Specification.where(TodoSpecs.equalWeather(weather))
+                .and(TodoSpecs.updatedAfter(start))
+                .and(TodoSpecs.updatedBefore(end));
+
+        // 모든 조건이 null이면 기존 메서드를 사용 아니면 Specification을 사용.
+        Page<Todo> todos;
+        if (weather == null && start == null && end == null){
+            todos = todoRepository.findAllByOrderByModifiedAtDesc(pageable);
+        } else {
+            todos = todoRepository.findAll(spec, pageable);
+        }
 
         return todos.map(todo -> new TodoResponse(
                 todo.getId(),
